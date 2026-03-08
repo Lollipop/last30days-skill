@@ -1,10 +1,16 @@
-# /last30days v2.8
+# /last30days v2.9.1
 
 **The AI world reinvents itself every month. This skill keeps you current.** /last30days researches your topic across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, and the web from the last 30 days, finds what the community is actually upvoting, sharing, betting on, and saying on camera, and writes you a grounded narrative with real citations. Whether it's Seedance 2.0 access, paper.design prompts, or the latest Nano Banana Pro techniques, you'll know what people who are paying attention already know.
 
+**New in v2.9.1 — Auto-save to ~/Documents/Last30Days/:** Every run now saves the complete briefing as a topic-named `.md` file to your Documents folder. Build a personal research library automatically. Inspired by [@devin_explores](https://x.com/devin_explores).
+
+**New in v2.9 — ScrapeCreators Reddit + Top Comments + Smart Discovery:**
+
+Reddit now runs on [ScrapeCreators](https://scrapecreators.com) by default — one `SCRAPECREATORS_API_KEY` covers Reddit, TikTok, and Instagram (3 sources, 1 key). Smart subreddit discovery finds the right communities automatically, and top comments are elevated with a 10% scoring weight and `💬` display with upvote counts. [Details below.](#whats-new-in-v29)
+
 **New in v2.8 — Instagram Reels + ScrapeCreators:**
 
-Instagram Reels is now the 8th signal source. TikTok and Instagram both run on [ScrapeCreators](https://scrapecreators.com) — one API key covers both. Search any topic and get trending Reels with views, likes, spoken-word transcripts, and hashtags. [Details below.](#whats-new-in-v28)
+Instagram Reels is now the 8th signal source. TikTok and Instagram both run on ScrapeCreators — one API key covers both. [Details below.](#whats-new-in-v28)
 
 **New in V2.5 - dramatically better results:**
 
@@ -31,9 +37,9 @@ git clone https://github.com/mvanhorn/last30days-skill.git ~/.claude/skills/last
 # Add your API keys (optional if signed in to Codex)
 mkdir -p ~/.config/last30days
 cat > ~/.config/last30days/.env << 'EOF'
-OPENAI_API_KEY=sk-...      # optional if using `codex login`
-XAI_API_KEY=xai-...        # optional - cookie auth is default for X search
-SCRAPECREATORS_API_KEY=... # optional - for TikTok + Instagram (scrapecreators.com)
+SCRAPECREATORS_API_KEY=... # Reddit + TikTok + Instagram (one key, all three) — scrapecreators.com
+OPENAI_API_KEY=sk-...      # optional — legacy Reddit fallback if using `codex login`
+XAI_API_KEY=xai-...        # optional — cookie auth is default for X search
 EOF
 chmod 600 ~/.config/last30days/.env
 ```
@@ -937,6 +943,50 @@ If your OpenAI org doesn't have access to a model (e.g., unverified for gpt-4.1)
 
 ---
 
+## What's New in v2.9
+
+### ScrapeCreators Reddit as default
+
+Reddit now runs on [ScrapeCreators](https://scrapecreators.com) by default. One `SCRAPECREATORS_API_KEY` powers Reddit, TikTok, and Instagram — three sources, one key. No more `OPENAI_API_KEY` required for Reddit search.
+
+```bash
+echo 'SCRAPECREATORS_API_KEY=your_key_here' >> ~/.config/last30days/.env
+```
+
+### Smart subreddit discovery
+
+Subreddit discovery now uses relevance-weighted scoring instead of pure frequency count. Each candidate subreddit is scored by `frequency × recency × topic-word match`, and a `UTILITY_SUBS` blocklist filters noise subreddits (r/tipofmytongue, r/whatisthisthing, etc.).
+
+| Topic | Before (v2.8) | After (v2.9) |
+|-------|---------------|--------------|
+| Claude Code skills | Generic programming subs | r/ClaudeAI, r/ClaudeCode, r/openclaw |
+| Kanye West | r/AskReddit, r/OutOfTheLoop | r/hiphopheads, r/Kanye, r/NFCWestMemeWar |
+| Nano Banana Pro | r/techsupport, r/whatisthisthing | r/GeminiAI, r/nanobanana2pro, r/macbookpro |
+
+### Top comments elevated
+
+Top comments now carry a 10% weight in the engagement scoring formula and are displayed prominently with `💬` and upvote counts:
+
+```
+**R1** (score:80) r/ClaudeAI (2026-02-28) [666pts, 63cmt]
+  Claude Code creator: In the next version, introducing two new skills
+  💬 Top comment (245 pts): "This is going to change how everyone works with Claude"
+```
+
+**Updated scoring formula:** `0.50 × log1p(score) + 0.35 × log1p(comments) + 0.05 × (ratio×10) + 0.10 × log1p(top_comment_score)` (was 0.55/0.40/0.05).
+
+### Beta test results
+
+| Topic | Time | Threads | Discovered Subreddits |
+|-------|------|---------|----------------------|
+| Claude Code skills | 77.1s | 99 | r/ClaudeAI, r/ClaudeCode, r/openclaw |
+| Kanye West | 71.7s | 84 | r/hiphopheads, r/NFCWestMemeWar, r/Kanye |
+| Anthropic odds | 68.0s | 65 | r/Anthropic, r/ClaudeAI, r/OpenAI |
+| Best rap songs lately | 68.9s | 114 | r/BestofRedditorUpdates, r/rap, r/TeenageRapFans |
+| Nano Banana Pro | 66.6s | 99 | r/GeminiAI, r/nanobanana2pro, r/macbookpro |
+
+---
+
 ## What's New in v2.8
 
 ### Instagram Reels as a source
@@ -1096,13 +1146,13 @@ Thanks to the contributors who helped shape V2:
 
 | Destination | Data Sent | API Key Required |
 |------------|-----------|-----------------|
-| `api.openai.com` | Search query (topic string) | OPENAI_API_KEY |
+| `api.scrapecreators.com` | Search query (Reddit + TikTok + Instagram) | SCRAPECREATORS_API_KEY |
+| `api.openai.com` | Search query (legacy Reddit fallback) | OPENAI_API_KEY |
 | `reddit.com` | Thread URLs for enrichment | None (public JSON) |
 | Twitter GraphQL / `api.x.ai` | Search query | Browser cookies or XAI_API_KEY |
 | `youtube.com` (via yt-dlp) | Search query | None (public search) |
 | `hn.algolia.com` | Search query | None (public API) |
 | `gamma-api.polymarket.com` | Search query | None (public API) |
-| `api.scrapecreators.com` | Search query (TikTok + Instagram) | SCRAPECREATORS_API_KEY |
 | `api.search.brave.com` | Search query (optional) | BRAVE_API_KEY |
 | `api.parallel.ai` | Search query (optional) | PARALLEL_API_KEY |
 | `openrouter.ai` | Search query (optional) | OPENROUTER_API_KEY |

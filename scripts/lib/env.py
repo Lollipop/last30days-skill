@@ -221,6 +221,30 @@ def config_exists() -> bool:
     return CONFIG_FILE.exists()
 
 
+def is_reddit_available(config: Dict[str, Any]) -> bool:
+    """Check if Reddit search is available.
+
+    Reddit can use either ScrapeCreators (preferred) or OpenAI.
+    """
+    has_sc = bool(config.get('SCRAPECREATORS_API_KEY'))
+    has_openai = bool(config.get('OPENAI_API_KEY')) and config.get('OPENAI_AUTH_STATUS') == AUTH_STATUS_OK
+    return has_sc or has_openai
+
+
+def get_reddit_source(config: Dict[str, Any]) -> Optional[str]:
+    """Determine which Reddit backend to use.
+
+    Priority: ScrapeCreators (cheaper, faster) > OpenAI (legacy)
+
+    Returns: 'scrapecreators', 'openai', or None
+    """
+    if config.get('SCRAPECREATORS_API_KEY'):
+        return 'scrapecreators'
+    if config.get('OPENAI_API_KEY') and config.get('OPENAI_AUTH_STATUS') == AUTH_STATUS_OK:
+        return 'openai'
+    return None
+
+
 def get_available_sources(config: Dict[str, Any]) -> str:
     """Determine which sources are available.
 
@@ -260,7 +284,7 @@ def get_web_search_source(config: Dict[str, Any]) -> Optional[str]:
 
 
 def get_missing_keys(config: Dict[str, Any]) -> str:
-    """Determine which sources are missing (accounting for Bird).
+    """Determine which sources are missing (accounting for Bird and ScrapeCreators).
 
     Returns: 'all', 'both', 'reddit', 'x', 'web', or 'none'
     """

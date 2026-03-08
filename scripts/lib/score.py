@@ -31,10 +31,16 @@ def log1p_safe(x: Optional[int]) -> float:
     return math.log1p(x)
 
 
-def compute_reddit_engagement_raw(engagement: Optional[schema.Engagement]) -> Optional[float]:
+def compute_reddit_engagement_raw(
+    engagement: Optional[schema.Engagement],
+    top_comment_score: Optional[int] = None,
+) -> Optional[float]:
     """Compute raw engagement score for Reddit item.
 
-    Formula: 0.55*log1p(score) + 0.40*log1p(num_comments) + 0.05*(upvote_ratio*10)
+    Formula: 0.50*log1p(score) + 0.35*log1p(num_comments) + 0.05*(upvote_ratio*10) + 0.10*log1p(top_comment_score)
+
+    The 10% comment quality weight rewards posts where the community engaged deeply
+    — a highly upvoted top comment means the thread sparked real discussion.
     """
     if engagement is None:
         return None
@@ -45,8 +51,9 @@ def compute_reddit_engagement_raw(engagement: Optional[schema.Engagement]) -> Op
     score = log1p_safe(engagement.score)
     comments = log1p_safe(engagement.num_comments)
     ratio = (engagement.upvote_ratio or 0.5) * 10
+    top_cmt = log1p_safe(top_comment_score)
 
-    return 0.55 * score + 0.40 * comments + 0.05 * ratio
+    return 0.50 * score + 0.35 * comments + 0.05 * ratio + 0.10 * top_cmt
 
 
 def compute_x_engagement_raw(engagement: Optional[schema.Engagement]) -> Optional[float]:
@@ -113,8 +120,13 @@ def score_reddit_items(items: List[schema.RedditItem]) -> List[schema.RedditItem
     if not items:
         return items
 
-    # Compute raw engagement scores
-    eng_raw = [compute_reddit_engagement_raw(item.engagement) for item in items]
+    # Compute raw engagement scores (with top comment quality signal)
+    eng_raw = []
+    for item in items:
+        top_cmt_score = None
+        if item.top_comments:
+            top_cmt_score = item.top_comments[0].score
+        eng_raw.append(compute_reddit_engagement_raw(item.engagement, top_cmt_score))
 
     # Normalize engagement to 0-100
     eng_normalized = normalize_to_100(eng_raw)

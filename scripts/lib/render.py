@@ -108,11 +108,11 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append("**🌐 WEB SEARCH MODE** - assistant will search blogs, docs & news")
         lines.append("")
         lines.append("---")
-        lines.append("**⚡ Want better results?** Add API keys or sign in to Codex to unlock Reddit & X data:")
-        lines.append("- `OPENAI_API_KEY` or `codex login` → Reddit threads with real upvotes & comments")
+        lines.append("**⚡ Want better results?** Add API keys to unlock Reddit, TikTok, Instagram & X data:")
+        lines.append("- `SCRAPECREATORS_API_KEY` → Reddit + TikTok + Instagram (one key, all three!) — real upvotes, comments, views")
         lines.append("- `XAI_API_KEY` → X posts with real likes & reposts")
+        lines.append("- `OPENAI_API_KEY` (legacy) → Reddit threads (slower, higher cost)")
         lines.append("- Edit `~/.config/last30days/.env` to add keys")
-        lines.append("- If already signed in but still seeing this, re-run `codex login`")
         lines.append("---")
         lines.append("")
 
@@ -137,7 +137,7 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append("*💡 Tip: Add an xAI key (`XAI_API_KEY`) for X/Twitter data and better triangulation.*")
         lines.append("")
     elif report.mode == "x-only" and missing_keys in ("reddit", "none"):
-        lines.append("*💡 Tip: Add OPENAI_API_KEY or run `codex login` for Reddit data and better triangulation. If already signed in, re-run `codex login`.*")
+        lines.append("*💡 Tip: Add `SCRAPECREATORS_API_KEY` for Reddit + TikTok + Instagram data (one key, all three) and better triangulation.*")
         lines.append("")
 
     # Reddit items
@@ -174,7 +174,15 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
             lines.append(f"  {item.url}")
             lines.append(f"  *{item.why_relevant}*")
 
-            # Top comment insights
+            # Top comment (elevated — Reddit's value IS the comments)
+            if item.top_comments and item.top_comments[0].score >= 10:
+                tc = item.top_comments[0]
+                excerpt = tc.excerpt[:200]
+                if len(tc.excerpt) > 200:
+                    excerpt = excerpt.rstrip() + "..."
+                lines.append(f'  \U0001f4ac Top comment ({tc.score} upvotes): "{excerpt}"')
+
+            # Comment insights
             if item.comment_insights:
                 lines.append("  Insights:")
                 for insight in item.comment_insights[:3]:
@@ -635,6 +643,15 @@ def render_full_report(report: schema.Report) -> str:
             if item.engagement:
                 eng = item.engagement
                 lines.append(f"- **Engagement:** {eng.score or '?'} points, {eng.num_comments or '?'} comments")
+
+            if item.top_comments and item.top_comments[0].score >= 10:
+                tc = item.top_comments[0]
+                excerpt = tc.excerpt[:200]
+                if len(tc.excerpt) > 200:
+                    excerpt = excerpt.rstrip() + "..."
+                lines.append("")
+                lines.append(f'**\U0001f4ac Top Comment** ({tc.score} upvotes, u/{tc.author}):')
+                lines.append(f'> {excerpt}')
 
             if item.comment_insights:
                 lines.append("")

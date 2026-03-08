@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1] - 2026-03-05
+
+### Highlights
+
+Auto-save research briefings to `~/Documents/Last30Days/` as topic-named .md files. Every run now builds a personal research library automatically - no more manual copy-paste.
+
+### Added
+
+- Auto-save complete research briefings (synthesis, stats, follow-up suggestions) to `~/Documents/Last30Days/{topic-slug}.md` after every run
+- Kebab-case filename generation from topic (e.g., "Claude Code skills" -> `claude-code-skills.md`)
+- Duplicate topic handling: appends date suffix instead of overwriting (e.g., `claude-code-skills-2026-03-05.md`)
+- Agent mode (`--agent`) also saves research files
+- Brief confirmation after save: "Saved to ~/Documents/Last30Days/{slug}.md"
+
+### Credits
+
+- [@devin_explores](https://x.com/devin_explores) -- Inspired this feature by sharing their workflow of saving every last30days run into organized .md files ([PR #51](https://github.com/mvanhorn/last30days-skill/pull/51))
+
+## [2.9.0] - 2026-03-05
+
+### Highlights
+
+ScrapeCreators Reddit as the default backend (one `SCRAPECREATORS_API_KEY` covers Reddit + TikTok + Instagram), smart subreddit discovery with relevance-weighted scoring, and top comments elevated with 10% scoring weight and prominent display.
+
+### Added
+
+- ScrapeCreators Reddit backend (`scripts/lib/reddit.py`) — keyword search, subreddit discovery, comment enrichment, all via `api.scrapecreators.com`
+- Smart subreddit discovery with relevance-weighted scoring: frequency × recency × topic-word match, replacing pure frequency count
+- `UTILITY_SUBS` blocklist to filter noise subreddits (r/tipofmytongue, r/whatisthisthing, etc.) from discovery results
+- Top comment scoring: 10% weight in engagement formula via `log1p(top_comment_score)`
+- Top comment rendering: `💬 Top comment` lines with upvote counts in compact and full report output
+- Comment excerpt length increased from 300 → 400 chars; `comment_insights` limit raised from 7 → 10
+
+### Changed
+
+- `primaryEnv` switched from `OPENAI_API_KEY` to `SCRAPECREATORS_API_KEY` — one key now powers Reddit, TikTok, and Instagram
+- Reddit engagement scoring formula: `0.55/0.40/0.05` (score/comments/ratio) → `0.50/0.35/0.05/0.10` (score/comments/ratio/top-comment)
+- SKILL.md synthesis instructions updated to emphasize quoting top comments
+
+### Fixed
+
+- Utility subreddit noise in discovery (e.g., r/tipofmytongue appearing for unrelated topics)
+- Reddit search no longer requires `OPENAI_API_KEY` — ScrapeCreators API handles search directly
+
 ## [2.8.0] - 2026-03-04
 
 ### Highlights
@@ -88,6 +132,8 @@ Three headline features: watchlists for always-on bots, YouTube transcripts as a
 
 Initial public release. Reddit + X search via OpenAI Responses API and xAI API.
 
+[2.9.1]: https://github.com/mvanhorn/last30days-skill/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/mvanhorn/last30days-skill/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/mvanhorn/last30days-skill/compare/v2.6.0...v2.8.0
 [2.1.0]: https://github.com/mvanhorn/last30days-skill/compare/v1.0.0...v2.1.0
 [1.0.0]: https://github.com/mvanhorn/last30days-skill/releases/tag/v1.0.0

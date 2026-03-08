@@ -1,7 +1,7 @@
 {
   "name": "last30days",
   "description": "Research any topic from the last 30 days across Reddit, X, YouTube, and the web",
-  "version": "2.1.0",
+  "version": "2.9.1",
   "author": {
     "name": "mvanhorn"
   },
