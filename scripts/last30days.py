@@ -47,6 +47,7 @@ TIMEOUT_PROFILES = {
 VALID_SEARCH_SOURCES = {
     "reddit", "x", "hn", "bluesky", "bsky", "truthsocial", "truth", "youtube", "tiktok", "instagram",
     "polymarket", "web", "xiaohongshu", "xhs",
+    "weibo", "zhihu", "bilibili",
 }
 
 
@@ -161,6 +162,10 @@ from lib import (
     xai_x,
     youtube_yt,
     query_type as qt,
+    weibo_search,
+    zhihu_search,
+    bilibili_search,
+    cn_trending,
 )
 
 
@@ -698,6 +703,81 @@ def _search_xiaohongshu(
     return items, None
 
 
+def _search_weibo(
+    topic: str,
+    config: dict,
+    from_date: str,
+    to_date: str,
+    depth: str,
+) -> tuple:
+    """Search Weibo for a topic (runs in thread).
+
+    Returns:
+        Tuple of (weibo_items, weibo_error)
+    """
+    cookie = env.get_weibo_cookie(config)
+    try:
+        items = weibo_search.search_weibo(
+            topic=topic,
+            from_date=from_date,
+            to_date=to_date,
+            depth=depth,
+            cookie=cookie,
+        )
+    except Exception as e:
+        return [], f"{type(e).__name__}: {e}"
+    return items, None
+
+
+def _search_zhihu(
+    topic: str,
+    config: dict,
+    from_date: str,
+    to_date: str,
+    depth: str,
+) -> tuple:
+    """Search Zhihu for a topic (runs in thread).
+
+    Returns:
+        Tuple of (zhihu_items, zhihu_error)
+    """
+    cookie = env.get_zhihu_cookie(config)
+    try:
+        items = zhihu_search.search_zhihu(
+            topic=topic,
+            from_date=from_date,
+            to_date=to_date,
+            depth=depth,
+            cookie=cookie,
+        )
+    except Exception as e:
+        return [], f"{type(e).__name__}: {e}"
+    return items, None
+
+
+def _search_bilibili(
+    topic: str,
+    from_date: str,
+    to_date: str,
+    depth: str,
+) -> tuple:
+    """Search Bilibili for a topic (runs in thread).
+
+    Returns:
+        Tuple of (bilibili_items, bilibili_error)
+    """
+    try:
+        items = bilibili_search.search_bilibili(
+            topic=topic,
+            from_date=from_date,
+            to_date=to_date,
+            depth=depth,
+        )
+    except Exception as e:
+        return [], f"{type(e).__name__}: {e}"
+    return items, None
+
+
 def _run_supplemental(
     topic: str,
     reddit_items: list,
@@ -883,6 +963,9 @@ def run_research(
     run_tiktok: bool = False,
     run_instagram: bool = False,
     run_xiaohongshu: bool = False,
+    run_weibo: bool = False,
+    run_zhihu: bool = False,
+    run_bilibili: bool = False,
     timeouts: dict = None,
     resolved_handle: str = None,
     do_hackernews: bool = True,
@@ -972,6 +1055,21 @@ def run_research(
                 xiaohongshu_error = f"{type(e).__name__}: {e}"
                 if progress:
                     progress.show_error(f"Xiaohongshu error: {e}")
+        # Chinese sources in web-only mode
+        for label, flag, fn, args_tuple in [
+            ("Weibo", run_weibo, _search_weibo, (topic, config, from_date, to_date, depth)),
+            ("Zhihu", run_zhihu, _search_zhihu, (topic, config, from_date, to_date, depth)),
+            ("Bilibili", run_bilibili, _search_bilibili, (topic, from_date, to_date, depth)),
+        ]:
+            if flag:
+                try:
+                    cn_items, cn_err = fn(*args_tuple)
+                    web_items.extend(cn_items)
+                    if cn_err and progress:
+                        progress.show_error(f"{label} error: {cn_err}")
+                except Exception as e:
+                    if progress:
+                        progress.show_error(f"{label} error: {e}")
         # Still run YouTube/TikTok/Instagram in web-only mode if available
         if run_youtube:
             if progress:
@@ -1028,6 +1126,9 @@ def run_research(
     tiktok_future = None
     instagram_future = None
     xiaohongshu_future = None
+    weibo_future = None
+    zhihu_future = None
+    bilibili_future = None
     hackernews_future = None
     bluesky_future = None
     truthsocial_future = None
@@ -1039,6 +1140,9 @@ def run_research(
         + (1 if run_tiktok else 0)
         + (1 if run_instagram else 0)
         + (1 if run_xiaohongshu else 0)
+        + (1 if run_weibo else 0)
+        + (1 if run_zhihu else 0)
+        + (1 if run_bilibili else 0)
         + (1 if do_hackernews else 0)
         + (1 if do_bluesky else 0)
         + (1 if do_truthsocial else 0)
@@ -1090,6 +1194,21 @@ def run_research(
         if run_xiaohongshu:
             xiaohongshu_future = executor.submit(
                 _search_xiaohongshu, topic, config, from_date, to_date, depth,
+            )
+
+        if run_weibo:
+            weibo_future = executor.submit(
+                _search_weibo, topic, config, from_date, to_date, depth,
+            )
+
+        if run_zhihu:
+            zhihu_future = executor.submit(
+                _search_zhihu, topic, config, from_date, to_date, depth,
+            )
+
+        if run_bilibili:
+            bilibili_future = executor.submit(
+                _search_bilibili, topic, from_date, to_date, depth,
             )
 
         if do_hackernews:
@@ -1223,6 +1342,46 @@ def run_research(
                 xiaohongshu_error = f"{type(e).__name__}: {e}"
                 if progress:
                     progress.show_error(f"Xiaohongshu error: {e}")
+
+        # --- Chinese source results ---
+        if weibo_future:
+            try:
+                wb_items, weibo_error = weibo_future.result(timeout=future_timeout)
+                web_items.extend(wb_items)
+                if weibo_error and progress:
+                    progress.show_error(f"Weibo error: {weibo_error}")
+            except TimeoutError:
+                if progress:
+                    progress.show_error(f"Weibo search timed out after {future_timeout}s")
+            except Exception as e:
+                if progress:
+                    progress.show_error(f"Weibo error: {e}")
+
+        if zhihu_future:
+            try:
+                zh_items, zhihu_error = zhihu_future.result(timeout=future_timeout)
+                web_items.extend(zh_items)
+                if zhihu_error and progress:
+                    progress.show_error(f"Zhihu error: {zhihu_error}")
+            except TimeoutError:
+                if progress:
+                    progress.show_error(f"Zhihu search timed out after {future_timeout}s")
+            except Exception as e:
+                if progress:
+                    progress.show_error(f"Zhihu error: {e}")
+
+        if bilibili_future:
+            try:
+                bl_items, bilibili_error = bilibili_future.result(timeout=future_timeout)
+                web_items.extend(bl_items)
+                if bilibili_error and progress:
+                    progress.show_error(f"Bilibili error: {bilibili_error}")
+            except TimeoutError:
+                if progress:
+                    progress.show_error(f"Bilibili search timed out after {future_timeout}s")
+            except Exception as e:
+                if progress:
+                    progress.show_error(f"Bilibili error: {e}")
 
         if hackernews_future:
             hn_timeout = timeouts.get("hackernews_future", future_timeout)
@@ -1507,6 +1666,19 @@ def main():
         metavar="DIR",
         help="Auto-save raw research output to DIR/{topic-slug}.md",
     )
+    parser.add_argument(
+        "--trending-cn",
+        action="store_true",
+        default=False,
+        help="Fetch Chinese trending topics (Weibo/Toutiao/Baidu) and exit.",
+    )
+    parser.add_argument(
+        "--trending-cn-limit",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Max items for --trending-cn (default: 20)",
+    )
 
     args = parser.parse_args()
     args.topic = " ".join(args.topic) if args.topic else None
@@ -1528,6 +1700,23 @@ def main():
         depth = "deep"
     else:
         depth = "default"
+
+    # Handle --trending-cn: fetch Chinese trending topics and exit
+    if getattr(args, 'trending_cn', False):
+        result = cn_trending.fetch_all_trending(limit=args.trending_cn_limit)
+        if args.emit == "json":
+            json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
+        else:
+            # Compact output
+            print(f"# Chinese Trending Topics ({result['timestamp']})")
+            print(f"Sources: {', '.join(result['sources'])} | Failed: {', '.join(result.get('sources_failed', []))}")
+            print(f"Total: {result['count']} items\n")
+            for i, item in enumerate(result['items'], 1):
+                label = f" [{item.get('label')}]" if item.get('label') else ""
+                print(f"{i:2d}. [{item['source_cn']}] {item['title']}{label}  (hot: {item.get('hot_normalized', 0):.0f})")
+                if item.get('url'):
+                    print(f"    {item['url']}")
+        sys.exit(0)
 
     # Install global timeout watchdog
     timeouts = TIMEOUT_PROFILES[depth]
@@ -1709,6 +1898,9 @@ def main():
     search_run_tiktok = has_tiktok and qt.is_source_enabled("tiktok", query_type)
     search_run_instagram = has_instagram and qt.is_source_enabled("instagram", query_type)
     search_run_xiaohongshu = has_xiaohongshu
+    search_run_weibo = True  # Always available (public API)
+    search_run_zhihu = True
+    search_run_bilibili = True
     if args.search:
         search_sources = parse_search_flag(args.search)
         has_reddit = "reddit" in search_sources
@@ -1720,8 +1912,10 @@ def main():
         search_run_youtube = "youtube" in search_sources and has_ytdlp
         search_run_tiktok = "tiktok" in search_sources and has_tiktok
         search_run_instagram = "instagram" in search_sources and has_instagram
-        # If explicitly requested, attempt Xiaohongshu even when preflight says unavailable.
         search_run_xiaohongshu = "xiaohongshu" in search_sources
+        search_run_weibo = "weibo" in search_sources
+        search_run_zhihu = "zhihu" in search_sources
+        search_run_bilibili = "bilibili" in search_sources
         include_search_web = "web" in search_sources
         # Map to existing sources string
         if has_reddit and has_x:
@@ -1750,6 +1944,9 @@ def main():
         run_tiktok=search_run_tiktok,
         run_instagram=search_run_instagram,
         run_xiaohongshu=search_run_xiaohongshu,
+        run_weibo=search_run_weibo,
+        run_zhihu=search_run_zhihu,
+        run_bilibili=search_run_bilibili,
         timeouts=timeouts,
         resolved_handle=args.x_handle,
         do_hackernews=search_do_hackernews,

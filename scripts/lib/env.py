@@ -250,6 +250,8 @@ def get_config() -> Dict[str, Any]:
         ('PARALLEL_API_KEY', None),
         ('BRAVE_API_KEY', None),
         ('XIAOHONGSHU_API_BASE', None),
+        ('WEIBO_COOKIE', None),
+        ('ZHIHU_COOKIE', None),
         ('GEMINI_MODEL', None),
         ('OPENAI_MODEL_POLICY', 'auto'),
         ('OPENAI_MODEL_PIN', None),
@@ -570,6 +572,44 @@ def is_xiaohongshu_available(config: Dict[str, Any]) -> bool:
 
 # Backward compat alias
 is_apify_available = is_tiktok_available
+
+
+# --- Chinese source availability checks ---
+
+def is_weibo_available(config: Dict[str, Any]) -> bool:
+    """Check if Weibo search is available.
+
+    Always returns True — Weibo mobile API is public.
+    Optional WEIBO_COOKIE improves reliability.
+    """
+    return True
+
+
+def get_weibo_cookie(config: Dict[str, Any]) -> str:
+    """Get optional Weibo cookie for authenticated search."""
+    return config.get('WEIBO_COOKIE') or os.environ.get('WEIBO_COOKIE', '')
+
+
+def is_zhihu_available(config: Dict[str, Any]) -> bool:
+    """Check if Zhihu search is available.
+
+    Always returns True — Zhihu search API is public.
+    Optional ZHIHU_COOKIE improves reliability.
+    """
+    return True
+
+
+def get_zhihu_cookie(config: Dict[str, Any]) -> str:
+    """Get optional Zhihu cookie for authenticated search."""
+    return config.get('ZHIHU_COOKIE') or os.environ.get('ZHIHU_COOKIE', '')
+
+
+def is_bilibili_available(config: Dict[str, Any]) -> bool:
+    """Check if Bilibili search is available.
+
+    Always returns True — Bilibili search API is public, no key needed.
+    """
+    return True
 
 
 def get_x_source_status(config: Dict[str, Any]) -> Dict[str, Any]:
